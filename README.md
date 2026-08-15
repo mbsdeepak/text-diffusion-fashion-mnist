@@ -131,6 +131,10 @@ python -m src.export_hf --which model --out hf_export
 # Reproduce the "published weights actually work" check — downloads them from the
 # Hugging Face Hub, loads them, and generates a grid (no local training needed):
 python -m scripts.verify_hf
+
+# Prove the model synthesizes rather than memorizes — for each generated image, find the
+# nearest of all 60k real training images (large distance = genuinely novel, not a copy):
+python -m scripts.nn_check
 ```
 
 All knobs (model size, timesteps, guidance, epochs) live in [`config.py`](config.py).
