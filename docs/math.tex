@@ -1,0 +1,126 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{mathtools}
+\usepackage{xcolor}
+\usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue]{hyperref}
+
+% --- notation shortcuts ---
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\x}{\mathbf{x}}
+\newcommand{\eps}{\boldsymbol{\epsilon}}
+\newcommand{\epstheta}{\eps_\theta}
+\newcommand{\ab}{\bar{\alpha}}          % alpha-bar
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+
+\title{\textbf{The Math Behind \texttt{text-diffusion-fashion-mnist}}\\[0.3em]
+\large A from-scratch text-conditioned DDPM}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-3em}
+
+\noindent This note collects the equations implemented in the repository, mapping each to the
+file where it lives. The model is a miniature Stable Diffusion: a U-Net learns to reverse a
+Gaussian noising process, conditioned on frozen CLIP text embeddings and steered at sample time
+by classifier-free guidance.
+
+\section{Forward process (adding noise)}
+\hfill\textit{\small src/diffusion.py — \texttt{q\_sample}}
+
+Given a clean image $\x_0$, the forward (diffusion) process gradually corrupts it over $T$
+timesteps with Gaussian noise governed by a variance schedule $\beta_1, \dots, \beta_T$. Define
+$\alpha_t = 1 - \beta_t$ and the cumulative product $\ab_t = \prod_{s=1}^{t} \alpha_s$. A key
+property is that we can sample $\x_t$ at \emph{any} timestep in closed form, without iterating:
+\begin{equation}
+  q(\x_t \mid \x_0) = \N\!\big(\x_t;\ \sqrt{\ab_t}\,\x_0,\ (1-\ab_t)\,\mathbf{I}\big),
+\end{equation}
+which, via the reparameterization trick, is implemented as
+\begin{equation}
+  \boxed{\ \x_t = \sqrt{\ab_t}\,\x_0 + \sqrt{1-\ab_t}\,\eps, \qquad \eps \sim \N(\mathbf{0}, \mathbf{I}).\ }
+\end{equation}
+
+\section{Cosine noise schedule}
+\hfill\textit{\small src/diffusion.py — \texttt{make\_beta\_schedule}}
+
+Rather than a linear $\beta_t$, we use the cosine schedule of Nichol \& Dhariwal, which destroys
+information more gradually and trains better at low resolution:
+\begin{equation}
+  \ab_t = \frac{f(t)}{f(0)}, \qquad
+  f(t) = \cos\!\left( \frac{t/T + s}{1 + s}\cdot\frac{\pi}{2} \right)^{\!2},
+  \qquad s = 0.008,
+\end{equation}
+and the per-step variances are recovered (and clipped for stability) as
+\begin{equation}
+  \beta_t = \min\!\left(1 - \frac{\ab_t}{\ab_{t-1}},\ 0.999\right).
+\end{equation}
+
+\section{Training objective}
+\hfill\textit{\small src/train.py — training loop}
+
+The U-Net $\epstheta(\x_t, t, c)$ is trained to predict the noise $\eps$ that was added, given the
+timestep $t$ and the text conditioning $c$. This yields the simple denoising objective
+\begin{equation}
+  \boxed{\ \mathcal{L}_{\text{simple}}
+  = \E_{\x_0,\ \eps \sim \N(\mathbf{0},\mathbf{I}),\ t \sim \mathcal{U}\{1,T\}}
+  \Big[\ \norm{\eps - \epstheta(\x_t, t, c)}^2\ \Big].\ }
+\end{equation}
+During training the caption $c$ is replaced by a null token $\varnothing$ with probability
+$p_{\text{drop}}$ (here $0.15$), so the network also learns the unconditional score
+$\epstheta(\x_t, t, \varnothing)$.
+
+\section{Text conditioning (the multimodal bridge)}
+\hfill\textit{\small src/text\_encoder.py, src/unet.py}
+
+Each Fashion-MNIST class is turned into a caption and encoded by a \emph{frozen} CLIP text
+encoder into token embeddings $c \in \R^{L \times d}$. The U-Net consumes these two ways:
+a pooled vector is added to the timestep embedding (FiLM), and cross-attention lets image
+positions (queries) attend to the text tokens (keys/values):
+\begin{equation}
+  \operatorname{Attention}(Q, K, V) = \operatorname{softmax}\!\left( \frac{Q K^{\top}}{\sqrt{d_k}} \right) V,
+  \qquad Q = W_Q\, h_{\text{img}},\quad K = W_K\, c,\quad V = W_V\, c.
+\end{equation}
+
+\section{Classifier-free guidance (sampling)}
+\hfill\textit{\small src/diffusion.py — \texttt{ddim\_sample}}
+
+At sample time we combine the conditional and unconditional noise predictions and extrapolate,
+with guidance scale $s$ trading diversity for prompt adherence:
+\begin{equation}
+  \boxed{\ \tilde{\eps}_\theta(\x_t, t, c)
+  = \epstheta(\x_t, t, \varnothing) + s\,\big( \epstheta(\x_t, t, c) - \epstheta(\x_t, t, \varnothing) \big).\ }
+\end{equation}
+
+\section{DDIM sampling (the reverse process)}
+\hfill\textit{\small src/diffusion.py — \texttt{ddim\_sample}}
+
+Instead of $T$ stochastic steps we take a short subsequence of timesteps and apply the
+(deterministic when $\eta=0$) DDIM update. First predict the clean image from the guided noise,
+\begin{equation}
+  \hat{\x}_0 = \frac{\x_t - \sqrt{1-\ab_t}\,\tilde{\eps}_\theta}{\sqrt{\ab_t}},
+\end{equation}
+then step to the previous timestep with noise scale
+\begin{equation}
+  \sigma_t = \eta \sqrt{\frac{1-\ab_{t-1}}{1-\ab_t}}\,\sqrt{1 - \frac{\ab_t}{\ab_{t-1}}},
+\end{equation}
+\begin{equation}
+  \boxed{\ \x_{t-1} = \sqrt{\ab_{t-1}}\,\hat{\x}_0
+  + \sqrt{1 - \ab_{t-1} - \sigma_t^2}\,\tilde{\eps}_\theta
+  + \sigma_t\,\mathbf{z}, \qquad \mathbf{z} \sim \N(\mathbf{0}, \mathbf{I}).\ }
+\end{equation}
+With $\eta = 0$ the $\sigma_t \mathbf{z}$ term vanishes and sampling is fully deterministic.
+
+\vspace{1em}
+\hrule
+\vspace{0.6em}
+\noindent\small\textbf{References.}\ Ho et al., \emph{DDPM} (2020);\ Nichol \& Dhariwal,
+\emph{Improved DDPM} (2021);\ Song et al., \emph{DDIM} (2021);\ Ho \& Salimans,
+\emph{Classifier-Free Guidance} (2022);\ Rombach et al., \emph{Latent Diffusion / Stable
+Diffusion} (2022).
+
+\end{document}

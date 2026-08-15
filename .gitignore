@@ -16,6 +16,15 @@ runs/
 # Generated samples — keep only the curated ones in assets/
 samples/
 
+# Training log
+train.log
+
+# LaTeX build intermediates (keep math.tex and math.pdf)
+*.aux
+*.log
+*.out
+*.synctex.gz
+
 # OS / editor
 .DS_Store
 .ipynb_checkpoints/

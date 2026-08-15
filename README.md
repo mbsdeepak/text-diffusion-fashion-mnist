@@ -32,17 +32,28 @@ small enough to train on an Apple-Silicon MacBook (MPS), no cloud GPU required.
 
 ## How it works
 
+> 📄 **Full derivations, every equation typeset:** [`docs/math.tex`](docs/math.tex) · [rendered PDF](docs/math.pdf)
+
 ### 1. The forward process (adding noise)
 Take a clean image `x₀` and add Gaussian noise over `T=1000` steps following a **cosine
 schedule**. Thanks to the reparameterization trick, we can jump to any step `t` in one shot:
 
-```
-x_t = √(ᾱ_t)·x₀ + √(1−ᾱ_t)·ε ,   ε ~ N(0, I)
+```math
+\mathbf{x}_t = \sqrt{\bar\alpha_t}\,\mathbf{x}_0 + \sqrt{1-\bar\alpha_t}\,\boldsymbol{\epsilon},
+\qquad \boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},\mathbf{I}),
+\qquad \bar\alpha_t = \prod_{s=1}^{t}(1-\beta_s)
 ```
 
 ### 2. The model (predicting the noise)
 A **U-Net** `ε_θ(x_t, t, text)` is trained to predict the noise `ε` that was added. The loss is
-just `MSE(ε_θ, ε)`. Conditioning enters two ways:
+just the mean-squared error between the true and predicted noise:
+
+```math
+\mathcal{L}_\text{simple} = \mathbb{E}_{\mathbf{x}_0,\,\boldsymbol{\epsilon},\,t}
+\big[\,\lVert \boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, c) \rVert^2\,\big]
+```
+
+Conditioning enters two ways:
 - **FiLM:** the timestep embedding + a pooled CLIP text vector are summed and injected into
   every ResBlock.
 - **Cross-attention:** at low resolutions, image features (queries) attend to the CLIP **token
@@ -58,8 +69,9 @@ training step, which keeps it fast on MPS.
 During training we randomly replace the caption with an empty string ~15% of the time, so the
 model learns both conditional and unconditional denoising. At sample time we combine them:
 
-```
-ε = ε_uncond + s·(ε_cond − ε_uncond)
+```math
+\tilde{\boldsymbol{\epsilon}}_\theta = \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \varnothing)
++ s\,\big(\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, c) - \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \varnothing)\big)
 ```
 
 `s` (the guidance scale) trades diversity for prompt-adherence. Higher `s` → sharper, more
