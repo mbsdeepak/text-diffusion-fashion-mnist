@@ -33,6 +33,24 @@ from pure noise (DDIM, 50 steps, guidance 1.5). **Pretrained weights:**
 
 ---
 
+## Results
+
+![training curve](assets/training_curve.png)
+
+Training loss (DDPM ε-prediction MSE) over 15 epochs on Apple-Silicon MPS — converges from
+**0.089 → 0.043**. Reproduce with `python -m scripts.plot_curve` (reads the committed
+[`assets/loss_history.csv`](assets/loss_history.csv)).
+
+**FID ≈ 27.2** — 2048 generated samples vs the Fashion-MNIST test set at guidance 1.5 (lower is
+better). Reproduce with `python -m scripts.fid`.
+
+> ⚠️ **Read FID carefully.** Standard FID uses ImageNet-InceptionV3 on 299×299 RGB, so this
+> absolute value (32×32 grayscale clothing, upscaled) is **not** comparable to natural-image FID
+> in the literature. It's a *relative* signal — useful for comparing guidance scales or
+> checkpoints, not for ranking against published models.
+
+---
+
 ## How it works
 
 > 📄 **Full derivations, every equation typeset:** [`docs/math.tex`](docs/math.tex) · [rendered PDF](docs/math.pdf)
@@ -184,7 +202,8 @@ python app.py          # opens http://127.0.0.1:7860
 
 ## Possible extensions
 
-- Add an **FID** score to quantify sample quality across guidance scales.
+- Track **FID across checkpoints and guidance scales** (a single-setting FID is already in
+  [`scripts/fid.py`](scripts/fid.py)) to plot quality vs. training/guidance.
 - Swap Fashion-MNIST for a small **captioned** dataset (e.g. Oxford Flowers + real captions) to
   make it genuinely open-vocabulary.
 - Move to **latent** diffusion (train a tiny VAE first) to scale resolution.

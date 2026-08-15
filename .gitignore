@@ -16,8 +16,9 @@ runs/
 # Generated samples — keep only the curated ones in assets/
 samples/
 
-# Training log
+# Training / eval logs
 train.log
+fid.log
 
 # HF export folder (weights live on the Hugging Face Hub, not in git)
 hf_export/
