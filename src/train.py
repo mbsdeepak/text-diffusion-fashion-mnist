@@ -8,6 +8,7 @@ every few epochs so you can watch the model learn.
 """
 from __future__ import annotations
 
+import argparse
 import copy
 import os
 import random
@@ -66,10 +67,19 @@ def save_preview(model, ema, diffusion, conditioner, cfg, path: str) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--resume", action="store_true",
+                        help="continue training from checkpoints/last.pt")
+    parser.add_argument("--epochs", type=int, default=None, help="override total epochs")
+    args = parser.parse_args()
+
     cfg = get_config()
+    if args.epochs is not None:
+        cfg.epochs = args.epochs
     set_seed(cfg.seed)
     os.makedirs(cfg.ckpt_dir, exist_ok=True)
     os.makedirs(cfg.sample_dir, exist_ok=True)
+    os.makedirs("assets", exist_ok=True)
     print(f"Device: {cfg.device}")
 
     loader = get_dataloader(cfg, train=True)
@@ -82,7 +92,25 @@ def main() -> None:
     n_params = sum(p.numel() for p in model.parameters()) / 1e6
     print(f"U-Net parameters: {n_params:.1f}M")
 
-    step = 0
+    # Resume from the last checkpoint if requested (restores weights, EMA, and optimizer state).
+    start_epoch = 0
+    ckpt_path = os.path.join(cfg.ckpt_dir, "last.pt")
+    if args.resume and os.path.exists(ckpt_path):
+        ck = torch.load(ckpt_path, map_location=cfg.device)
+        model.load_state_dict(ck["model"])
+        ema.shadow = {k: v.to(cfg.device) for k, v in ck["ema"].items()}
+        if "optim" in ck:
+            optim.load_state_dict(ck["optim"])
+        start_epoch = ck["epoch"] + 1
+        print(f"Resumed from {ckpt_path}: continuing at epoch {start_epoch + 1}/{cfg.epochs}")
+
+    # Loss history CSV (accumulates across resumes) — feeds scripts/plot_curve.py.
+    csv_path = os.path.join("assets", "loss_history.csv")
+    if not (args.resume and os.path.exists(csv_path)):
+        with open(csv_path, "w") as f:
+            f.write("epoch,avg_loss\n")
+
+    step = start_epoch * len(loader)
     for epoch in range(cfg.epochs):
         model.train()
         running, count = 0.0, 0
@@ -118,11 +146,15 @@ def main() -> None:
             if step % cfg.log_every == 0:
                 pbar.set_postfix(loss=f"{loss.item():.4f}")
 
-        print(f"[epoch {epoch + 1}/{cfg.epochs}] avg_loss={running / max(count, 1):.4f}", flush=True)
+        avg = running / max(count, 1)
+        print(f"[epoch {epoch + 1}/{cfg.epochs}] avg_loss={avg:.4f}", flush=True)
+        with open(csv_path, "a") as f:
+            f.write(f"{epoch + 1},{avg:.4f}\n")
 
         ckpt = {
             "model": model.state_dict(),
             "ema": ema.shadow,
+            "optim": optim.state_dict(),
             "epoch": epoch,
             "config": cfg.__dict__,
         }
