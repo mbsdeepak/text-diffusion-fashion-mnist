@@ -111,7 +111,7 @@ def main() -> None:
             f.write("epoch,avg_loss\n")
 
     step = start_epoch * len(loader)
-    for epoch in range(cfg.epochs):
+    for epoch in range(start_epoch, cfg.epochs):
         model.train()
         running, count = 0.0, 0
         pbar = tqdm(loader, desc=f"epoch {epoch + 1}/{cfg.epochs}")
