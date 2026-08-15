@@ -133,6 +133,19 @@ All knobs (model size, timesteps, guidance, epochs) live in [`config.py`](config
 
 ---
 
+## Interactive demo
+
+A Gradio app ([`app.py`](app.py)) lets you generate garments interactively — pick a category,
+tweak the guidance scale / DDIM steps, and sample. It pulls the trained weights from the
+[Hugging Face model repo](https://huggingface.co/mbsdeepak/text-diffusion-fashion-mnist).
+
+```bash
+pip install gradio
+python app.py          # opens http://127.0.0.1:7860
+```
+
+---
+
 ## Design choices & what I learned
 
 - **ε-prediction over x₀-prediction** — predicting the noise gives a better-conditioned loss and
