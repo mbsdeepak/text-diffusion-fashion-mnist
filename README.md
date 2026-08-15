@@ -13,9 +13,12 @@ small enough to train on an Apple-Silicon MacBook (MPS), no cloud GPU required.
 > text-to-image pipeline end-to-end. Results are deliberately modest — Fashion-MNIST at 32×32 —
 > but the architecture is the real thing, just scaled down.
 
-<!-- After training, drop a sample grid here:
 ![samples](assets/samples.png)
--->
+
+*Generated samples after 15 epochs on an M-series Mac (MPS). One row per class — t-shirt,
+trouser, pullover, dress, coat, sandal, shirt, sneaker, bag, ankle boot — each image synthesised
+from pure noise (DDIM, 50 steps, guidance 3.0). **Pretrained weights:**
+[huggingface.co/mbsdeepak/text-diffusion-fashion-mnist](https://huggingface.co/mbsdeepak/text-diffusion-fashion-mnist).*
 
 ---
 
@@ -117,9 +120,13 @@ python -m scripts.smoke_test
 #    preview grids to samples/ every couple of epochs):
 python -m src.train
 
-# 3. Generate images from the trained model:
-python -m src.sample --classes all --n 6 --out assets/samples.png
-python -m src.sample --classes sneaker,bag,dress --n 8 --guidance 4.0 --out assets/picks.png
+# 3. Generate images from the trained model (--weights model uses the raw weights, best for
+#    short runs where the EMA average still lags):
+python -m src.sample --classes all --n 8 --weights model --out assets/samples.png
+python -m src.sample --classes sneaker,bag,dress --n 8 --weights model --guidance 4.0 --out assets/picks.png
+
+# 4. (optional) Export the trained weights for the Hugging Face Hub:
+python -m src.export_hf --which model --out hf_export
 ```
 
 All knobs (model size, timesteps, guidance, epochs) live in [`config.py`](config.py).
@@ -132,8 +139,11 @@ All knobs (model size, timesteps, guidance, epochs) live in [`config.py`](config
   is the standard DDPM parameterization.
 - **Cosine schedule over linear** — adds noise more gradually; the linear schedule destroys
   low-resolution image information too fast.
-- **EMA weights** — sampling from an exponential moving average of the weights gives visibly
-  cleaner images than the raw training weights.
+- **EMA horizon must match training length** — EMA weights usually give cleaner samples, but the
+  decay sets an averaging window (`1/(1-decay)` steps). At `0.9999` that's ~10k steps, so on this
+  short 15-epoch (~7k-step) run the EMA still lagged the live weights and produced noise — the
+  **raw** weights were sharper. Lesson learned; sampling defaults to `--weights model` here. A
+  longer run (or `ema_decay≈0.999`) would flip this back.
 - **Caching CLIP embeddings** — because the label set is fixed, running the text encoder once
   instead of every step cut training time substantially on MPS.
 - **Cross-attention placement** — only at 8×8 and 16×16. Attention at 32×32 is expensive and adds

@@ -43,6 +43,8 @@ def main() -> None:
     p.add_argument("--guidance", type=float, default=None, help="CFG scale (default: config)")
     p.add_argument("--steps", type=int, default=None, help="DDIM steps (default: config)")
     p.add_argument("--out", default="assets/samples.png")
+    p.add_argument("--weights", choices=["ema", "model"], default="ema",
+                   help="which weights to sample from; use 'model' (raw) for short runs where EMA lags")
     p.add_argument("--seed", type=int, default=None)
     args = p.parse_args()
 
@@ -58,7 +60,9 @@ def main() -> None:
     model = UNet(cfg).to(cfg.device)
 
     ckpt = torch.load(args.ckpt, map_location=cfg.device)
-    model.load_state_dict(ckpt.get("ema", ckpt["model"]))
+    key = args.weights if args.weights in ckpt else "model"
+    model.load_state_dict(ckpt[key])
+    print(f"Loaded '{key}' weights from {args.ckpt} (epoch {ckpt.get('epoch', '?')})")
     model.eval()
     diffusion = GaussianDiffusion(cfg).to(cfg.device)
 

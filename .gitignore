@@ -19,6 +19,9 @@ samples/
 # Training log
 train.log
 
+# HF export folder (weights live on the Hugging Face Hub, not in git)
+hf_export/
+
 # LaTeX build intermediates (keep math.tex and math.pdf)
 *.aux
 *.log
