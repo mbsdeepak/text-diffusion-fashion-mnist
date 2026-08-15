@@ -85,6 +85,7 @@ def main() -> None:
     step = 0
     for epoch in range(cfg.epochs):
         model.train()
+        running, count = 0.0, 0
         pbar = tqdm(loader, desc=f"epoch {epoch + 1}/{cfg.epochs}")
         for images, labels in pbar:
             images = images.to(cfg.device)
@@ -101,6 +102,10 @@ def main() -> None:
             pred = model(x_t, t, pooled, tokens, mask)
             loss = torch.nn.functional.mse_loss(pred, noise)
 
+            if not torch.isfinite(loss):
+                print(f"DIVERGED: non-finite loss at step {step}, epoch {epoch + 1}", flush=True)
+                return
+
             optim.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
@@ -108,8 +113,12 @@ def main() -> None:
             ema.update(model)
 
             step += 1
+            running += loss.item()
+            count += 1
             if step % cfg.log_every == 0:
                 pbar.set_postfix(loss=f"{loss.item():.4f}")
+
+        print(f"[epoch {epoch + 1}/{cfg.epochs}] avg_loss={running / max(count, 1):.4f}", flush=True)
 
         ckpt = {
             "model": model.state_dict(),
