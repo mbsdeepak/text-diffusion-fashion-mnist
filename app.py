@@ -63,7 +63,7 @@ with gr.Blocks(title="text-diffusion-fashion-mnist") as demo:
         with gr.Column(scale=1):
             category = gr.Dropdown(FASHION_CLASSES, value="sneaker", label="Category")
             n_images = gr.Slider(1, 8, value=4, step=1, label="Number of images")
-            guidance = gr.Slider(1.0, 8.0, value=3.0, step=0.5, label="Guidance scale (CFG)")
+            guidance = gr.Slider(1.0, 8.0, value=1.5, step=0.5, label="Guidance scale (CFG)")
             steps = gr.Slider(10, 50, value=40, step=5, label="DDIM steps")
             seed = gr.Number(value=42, label="Seed (-1 = random)")
             btn = gr.Button("Generate", variant="primary")
@@ -72,7 +72,7 @@ with gr.Blocks(title="text-diffusion-fashion-mnist") as demo:
 
     btn.click(generate, [category, n_images, guidance, steps, seed], gallery)
     gr.Examples(
-        examples=[["sneaker", 4, 3.0, 40, 42], ["dress", 4, 4.0, 40, 7], ["bag", 4, 3.0, 40, 1]],
+        examples=[["sneaker", 4, 1.5, 40, 42], ["dress", 4, 1.5, 40, 7], ["bag", 4, 2.0, 40, 1]],
         inputs=[category, n_images, guidance, steps, seed],
     )
 

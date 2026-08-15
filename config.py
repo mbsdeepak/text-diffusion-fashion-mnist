@@ -73,7 +73,7 @@ class Config:
     # --- sampling ---
     ddim_steps: int = 50          # DDIM lets us sample in 50 steps instead of 1000
     ddim_eta: float = 0.0         # 0 = deterministic DDIM
-    guidance_scale: float = 3.0   # classifier-free guidance strength
+    guidance_scale: float = 1.5   # classifier-free guidance; small/short-trained models artifact at high CFG
 
     # --- io / runtime ---
     ckpt_dir: str = "checkpoints"

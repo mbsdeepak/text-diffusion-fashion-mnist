@@ -17,7 +17,7 @@ small enough to train on an Apple-Silicon MacBook (MPS), no cloud GPU required.
 
 *Generated samples after 15 epochs on an M-series Mac (MPS). One row per class — t-shirt,
 trouser, pullover, dress, coat, sandal, shirt, sneaker, bag, ankle boot — each image synthesised
-from pure noise (DDIM, 50 steps, guidance 3.0). **Pretrained weights:**
+from pure noise (DDIM, 50 steps, guidance 1.5). **Pretrained weights:**
 [huggingface.co/mbsdeepak/text-diffusion-fashion-mnist](https://huggingface.co/mbsdeepak/text-diffusion-fashion-mnist).*
 
 ---
@@ -123,7 +123,7 @@ python -m src.train
 # 3. Generate images from the trained model (--weights model uses the raw weights, best for
 #    short runs where the EMA average still lags):
 python -m src.sample --classes all --n 8 --weights model --out assets/samples.png
-python -m src.sample --classes sneaker,bag,dress --n 8 --weights model --guidance 4.0 --out assets/picks.png
+python -m src.sample --classes sneaker,bag,dress --n 8 --weights model --guidance 1.5 --out assets/picks.png
 
 # 4. (optional) Export the trained weights for the Hugging Face Hub:
 python -m src.export_hf --which model --out hf_export
@@ -161,6 +161,10 @@ python app.py          # opens http://127.0.0.1:7860
   instead of every step cut training time substantially on MPS.
 - **Cross-attention placement** — only at 8×8 and 16×16. Attention at 32×32 is expensive and adds
   little for images this small.
+- **Guidance scale must match model strength** — my first grid used CFG 3.0 and looked like
+  patchy blobs; the samples only became recognizable garments at **CFG 1.5**. Classifier-free
+  guidance extrapolates `ε_cond − ε_uncond`, and on a small, 15-epoch model that extrapolation
+  amplifies artifacts. Low guidance (1.0–1.5) is the right regime here; default is now 1.5.
 
 ## Honest limitations
 
