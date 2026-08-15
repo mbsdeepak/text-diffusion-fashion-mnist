@@ -127,6 +127,10 @@ python -m src.sample --classes sneaker,bag,dress --n 8 --weights model --guidanc
 
 # 4. (optional) Export the trained weights for the Hugging Face Hub:
 python -m src.export_hf --which model --out hf_export
+
+# Reproduce the "published weights actually work" check — downloads them from the
+# Hugging Face Hub, loads them, and generates a grid (no local training needed):
+python -m scripts.verify_hf
 ```
 
 All knobs (model size, timesteps, guidance, epochs) live in [`config.py`](config.py).
