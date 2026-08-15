@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Data & model artifacts (regenerated locally)
+data/
+checkpoints/
+runs/
+*.pt
+*.ckpt
+
+# Generated samples — keep only the curated ones in assets/
+samples/
+
+# OS / editor
+.DS_Store
+.ipynb_checkpoints/
+.idea/
+.vscode/

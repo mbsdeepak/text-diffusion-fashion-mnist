@@ -1,0 +1,8 @@
+# Core — tested on Python 3.13, Apple Silicon (MPS)
+torch>=2.6.0
+torchvision>=0.21.0
+transformers>=4.44.0
+numpy>=1.26.0
+Pillow>=10.0.0
+tqdm>=4.66.0
+matplotlib>=3.8.0
