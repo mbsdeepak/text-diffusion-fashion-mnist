@@ -39,12 +39,20 @@ class GaussianDiffusion:
         self.alphas_cumprod = torch.cumprod(alphas, dim=0)
         self.sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - self.alphas_cumprod)
+        self.snr = self.alphas_cumprod / (1.0 - self.alphas_cumprod)  # signal-to-noise ratio per t
 
     def to(self, device: str) -> "GaussianDiffusion":
         for name in ("betas", "alphas_cumprod", "sqrt_alphas_cumprod",
-                     "sqrt_one_minus_alphas_cumprod"):
+                     "sqrt_one_minus_alphas_cumprod", "snr"):
             setattr(self, name, getattr(self, name).to(device))
         return self
+
+    def min_snr_weight(self, t: torch.Tensor, gamma: float) -> torch.Tensor:
+        """Per-sample Min-SNR-γ loss weight for ε-prediction: min(SNR_t, γ) / SNR_t = min(1, γ/SNR_t).
+        Down-weights high-SNR (low-noise) timesteps so training isn't dominated by easy steps."""
+        if gamma <= 0:
+            return torch.ones(t.shape[0], device=t.device)
+        return (gamma / self.snr.gather(0, t)).clamp(max=1.0)
 
     # ---- forward process (training) ----
     def q_sample(self, x0: torch.Tensor, t: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:

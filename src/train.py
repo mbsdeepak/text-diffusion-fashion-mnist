@@ -128,7 +128,10 @@ def main() -> None:
             x_t = diffusion.q_sample(images, t, noise)
 
             pred = model(x_t, t, pooled, tokens, mask)
-            loss = torch.nn.functional.mse_loss(pred, noise)
+            per_sample = ((pred - noise) ** 2).flatten(1).mean(dim=1)  # [B]
+            w = diffusion.min_snr_weight(t, cfg.min_snr_gamma)
+            loss = (w * per_sample).mean()          # optimized (Min-SNR weighted)
+            plain_loss = per_sample.mean()          # logged, unweighted — comparable across runs
 
             if not torch.isfinite(loss):
                 print(f"DIVERGED: non-finite loss at step {step}, epoch {epoch + 1}", flush=True)
@@ -141,10 +144,10 @@ def main() -> None:
             ema.update(model)
 
             step += 1
-            running += loss.item()
+            running += plain_loss.item()
             count += 1
             if step % cfg.log_every == 0:
-                pbar.set_postfix(loss=f"{loss.item():.4f}")
+                pbar.set_postfix(loss=f"{plain_loss.item():.4f}")
 
         avg = running / max(count, 1)
         print(f"[epoch {epoch + 1}/{cfg.epochs}] avg_loss={avg:.4f}", flush=True)

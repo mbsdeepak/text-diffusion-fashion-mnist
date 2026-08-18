@@ -44,6 +44,7 @@ class Config:
     # --- diffusion ---
     timesteps: int = 1000         # T for training (cosine schedule)
     schedule: str = "cosine"      # "cosine" (Nichol & Dhariwal) or "linear"
+    min_snr_gamma: float = 5.0    # Min-SNR-γ loss weighting (Hang et al. 2023); 0 disables
 
     # --- model (U-Net) ---
     base_channels: int = 64
