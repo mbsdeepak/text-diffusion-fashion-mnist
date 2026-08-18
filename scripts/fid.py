@@ -56,7 +56,9 @@ def main() -> None:
     real = ds.data[:n].float() / 255.0
     real = F.interpolate(real[:, None], size=cfg.image_size, mode="bilinear", align_corners=False)
     real = real * 2 - 1  # -> [-1,1]
-    fid.update(to_uint8_rgb(real), real=True)
+    # Feed real images through Inception in batches too (a single 2048-image pass spikes RAM).
+    for i in range(0, n, args.batch):
+        fid.update(to_uint8_rgb(real[i:i + args.batch]), real=True)
     print(f"registered {n} real images")
 
     # --- generated: n samples spread evenly across the 10 classes ---

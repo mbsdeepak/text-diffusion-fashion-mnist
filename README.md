@@ -15,7 +15,7 @@ small enough to train on an Apple-Silicon MacBook (MPS), no cloud GPU required.
 
 ![samples](assets/samples.png)
 
-*Generated samples after 15 epochs on an M-series Mac (MPS). One row per class — t-shirt,
+*Generated samples after 25 epochs on an M-series Mac (MPS). One row per class — t-shirt,
 trouser, pullover, dress, coat, sandal, shirt, sneaker, bag, ankle boot — each image synthesised
 from pure noise (DDIM, 50 steps, guidance 1.5). **Pretrained weights:**
 [huggingface.co/mbsdeepak/text-diffusion-fashion-mnist](https://huggingface.co/mbsdeepak/text-diffusion-fashion-mnist).*
@@ -37,12 +37,12 @@ from pure noise (DDIM, 50 steps, guidance 1.5). **Pretrained weights:**
 
 ![training curve](assets/training_curve.png)
 
-Training loss (DDPM ε-prediction MSE) over 15 epochs on Apple-Silicon MPS — converges from
-**0.089 → 0.043**. Reproduce with `python -m scripts.plot_curve` (reads the committed
+Training loss (DDPM ε-prediction MSE) over 25 epochs on Apple-Silicon MPS — converges from
+**0.089 → 0.042**. Reproduce with `python -m scripts.plot_curve` (reads the committed
 [`assets/loss_history.csv`](assets/loss_history.csv)).
 
-**FID ≈ 27.2** — 2048 generated samples vs the Fashion-MNIST test set at guidance 1.5 (lower is
-better). Reproduce with `python -m scripts.fid`.
+**FID ≈ 26.3** — 2048 generated samples vs the Fashion-MNIST test set at guidance 1.5 (lower is
+better; down from 27.2 at 15 epochs). Reproduce with `python -m scripts.fid`.
 
 > ⚠️ **Read FID carefully.** Standard FID uses ImageNet-InceptionV3 on 299×299 RGB, so this
 > absolute value (32×32 grayscale clothing, upscaled) is **not** comparable to natural-image FID
@@ -180,7 +180,7 @@ python app.py          # opens http://127.0.0.1:7860
   low-resolution image information too fast.
 - **EMA horizon must match training length** — EMA weights usually give cleaner samples, but the
   decay sets an averaging window (`1/(1-decay)` steps). At `0.9999` that's ~10k steps, so on this
-  short 15-epoch (~7k-step) run the EMA still lagged the live weights and produced noise — the
+  short 25-epoch (~12k-step) run the EMA still lagged the live weights and produced noise — the
   **raw** weights were sharper. Lesson learned; sampling defaults to `--weights model` here. A
   longer run (or `ema_decay≈0.999`) would flip this back.
 - **Caching CLIP embeddings** — because the label set is fixed, running the text encoder once
@@ -189,7 +189,7 @@ python app.py          # opens http://127.0.0.1:7860
   little for images this small.
 - **Guidance scale must match model strength** — my first grid used CFG 3.0 and looked like
   patchy blobs; the samples only became recognizable garments at **CFG 1.5**. Classifier-free
-  guidance extrapolates `ε_cond − ε_uncond`, and on a small, 15-epoch model that extrapolation
+  guidance extrapolates `ε_cond − ε_uncond`, and on a small, lightly-trained model that extrapolation
   amplifies artifacts. Low guidance (1.0–1.5) is the right regime here; default is now 1.5.
 
 ## Honest limitations
